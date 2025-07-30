@@ -1,0 +1,17 @@
+{
+    "project_overview": {
+        "name": "get_project_overview",
+        "description": "Call this tool when you need to understand the business context, target audience, or core functionality of the project. Use this information to make decisions about feature implementation, user experience, and business logic alignment. Essential for ensuring your code serves the intended business purpose and user needs.",
+        "file": "PROJECT_OVERVIEW.md"
+    },
+    "project_structure": {
+        "name": "get_project_structure",
+        "description": "Use this tool to retrieve the overall structure of the project, including key directories and files. This is crucial for understanding how the project is organized, which can inform your decisions on where to place new code, how to navigate the codebase, and how to maintain consistency across the project.",
+        "file": "PROJECT_STRUCTURE.md"
+    },
+    "technology_stack": {
+        "name": "get_technology_stack",
+        "description": "Call this tool to get an overview of the technologies used in the project. This includes programming languages, frameworks, libraries, and tools. Understanding the technology stack is essential for making informed decisions about code implementation, compatibility, and leveraging existing tools effectively.",
+        "file": "TECHNOLOGY_STACK.md"
+    }
+}
