@@ -1,11 +1,14 @@
 import json
 import asyncio
 from typing import Dict, Any, Optional
-from fastapi import Request, Response, HTTPException
+from fastapi import APIRouter, Request, Response, HTTPException, Depends
+from pydantic import BaseModel, Field
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 from app.storage import storage
 from app.config import settings
+from app.tool_loader import get_tool_loader
+from app.auth import verify_api_key
 
 
 class MCPOverHTTPHandler:
@@ -34,32 +37,6 @@ class MCPOverHTTPHandler:
                     }
                 ),
                 Tool(
-                    name="update_project_overview",
-                    description="Update project overview information when project requirements, target users, or business objectives change. Use this to keep the project context current and aligned with stakeholder expectations.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "project_id": {
-                                "type": "string",
-                                "description": "Project identifier (defaults to 'default')",
-                                "default": "default"
-                            },
-                            "business_description": {
-                                "type": "string",
-                                "description": "Clear description of what the business/project does, its value proposition, and core objectives"
-                            },
-                            "target_users": {
-                                "type": "string",
-                                "description": "Detailed description of the intended users, their needs, technical level, and use cases"
-                            },
-                            "main_features": {
-                                "type": "string",
-                                "description": "List of primary features and functionality that define the project's core capabilities"
-                            }
-                        }
-                    }
-                ),
-                Tool(
                     name="get_technology_stack",
                     description="Call this tool before writing code to understand which frameworks, libraries, and technologies are already in use. Essential for maintaining consistency, avoiding conflicts, and ensuring compatibility. Use this information to choose appropriate dependencies, follow established patterns, and integrate properly with existing systems.",
                     inputSchema={
@@ -74,40 +51,6 @@ class MCPOverHTTPHandler:
                     }
                 ),
                 Tool(
-                    name="update_technology_stack",
-                    description="Update technology stack information when new tools, frameworks, or services are added to the project. Keep this current to help future development decisions and maintain team alignment on approved technologies.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "project_id": {
-                                "type": "string",
-                                "description": "Project identifier (defaults to 'default')",
-                                "default": "default"
-                            },
-                            "frontend": {
-                                "type": "string",
-                                "description": "Frontend frameworks, libraries, and tools (e.g., React 18, Next.js, Tailwind CSS, TypeScript)"
-                            },
-                            "backend": {
-                                "type": "string",
-                                "description": "Backend technologies, frameworks, and runtime environments (e.g., Node.js, Express.js, Python FastAPI, .NET Core)"
-                            },
-                            "database": {
-                                "type": "string",
-                                "description": "Database systems, ORMs, migration tools (e.g., PostgreSQL, MongoDB, Prisma, Alembic)"
-                            },
-                            "infrastructure": {
-                                "type": "string",
-                                "description": "Deployment, hosting, containers, cloud services (e.g., Docker, Kubernetes, AWS, Vercel)"
-                            },
-                            "tools": {
-                                "type": "string",
-                                "description": "Development tools, testing frameworks, CI/CD, linting (e.g., Jest, ESLint, GitHub Actions, Webpack)"
-                            }
-                        }
-                    }
-                ),
-                Tool(
                     name="get_project_structure",
                     description="Call this tool whenever you are generating code and need to align with the project's file organization, naming conventions, or architecture guidelines. Ensures that generated code fits cleanly into the existing structure of the app and services. Essential for maintaining code organization, following team standards, and ensuring files are placed in the correct locations.",
                     inputSchema={
@@ -117,32 +60,6 @@ class MCPOverHTTPHandler:
                                 "type": "string",
                                 "description": "Project identifier (defaults to 'default')",
                                 "default": "default"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="update_project_structure",
-                    description="Update project structure guidelines when file organization, naming conventions, or architectural patterns change. Use this to document new standards and ensure consistency across the codebase as the project evolves.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "project_id": {
-                                "type": "string",
-                                "description": "Project identifier (defaults to 'default')",
-                                "default": "default"
-                            },
-                            "folder_structure": {
-                                "type": "string",
-                                "description": "Detailed folder organization with explanations of what goes where (e.g., /src/components for React components, /lib for utilities, /pages for Next.js routes)"
-                            },
-                            "naming_conventions": {
-                                "type": "string",
-                                "description": "File naming patterns, variable naming styles, class naming conventions (e.g., PascalCase for components, camelCase for functions, kebab-case for files)"
-                            },
-                            "architecture_approach": {
-                                "type": "string",
-                                "description": "Architectural patterns, design principles, code organization strategies (e.g., MVC, clean architecture, microservices, monorepo structure)"
                             }
                         }
                     }
@@ -185,16 +102,6 @@ class MCPOverHTTPHandler:
                 
                 return [TextContent(type="text", text=content)]
             
-            elif name == "update_project_overview":
-                data_dict = {
-                    'business_description': arguments.get("business_description"),
-                    'target_users': arguments.get("target_users"),
-                    'main_features': arguments.get("main_features")
-                }
-                
-                storage.save_project_overview(project_id, data_dict)
-                return [TextContent(type="text", text=f"Project overview for '{project_id}' updated successfully")]
-                
             elif name == "get_technology_stack":
                 tech_stack_data = storage.get_technology_stack(project_id)
                 
@@ -237,18 +144,6 @@ class MCPOverHTTPHandler:
                 
                 return [TextContent(type="text", text=content)]
             
-            elif name == "update_technology_stack":
-                data_dict = {
-                    'frontend': arguments.get("frontend"),
-                    'backend': arguments.get("backend"),
-                    'database': arguments.get("database"),
-                    'infrastructure': arguments.get("infrastructure"),
-                    'tools': arguments.get("tools")
-                }
-                
-                storage.save_technology_stack(project_id, data_dict)
-                return [TextContent(type="text", text=f"Technology stack for '{project_id}' updated successfully")]
-                
             elif name == "get_project_structure":
                 structure_data = storage.get_project_structure(project_id)
                 
@@ -278,16 +173,6 @@ class MCPOverHTTPHandler:
 {structure_data.get('architecture_approach') or '*No architecture approach defined*'}"""
                 
                 return [TextContent(type="text", text=content)]
-            
-            elif name == "update_project_structure":
-                data_dict = {
-                    'folder_structure': arguments.get("folder_structure"),
-                    'naming_conventions': arguments.get("naming_conventions"),
-                    'architecture_approach': arguments.get("architecture_approach")
-                }
-                
-                storage.save_project_structure(project_id, data_dict)
-                return [TextContent(type="text", text=f"Project structure for '{project_id}' updated successfully")
         
         # Store handlers for direct access
         self.list_tools_handler = list_tools
@@ -384,3 +269,138 @@ class MCPOverHTTPHandler:
 
 # Global handler instance
 mcp_handler = MCPOverHTTPHandler()
+
+
+# Pydantic models for HTTP API
+class ToolUpdateRequest(BaseModel):
+    """Dynamic update request based on tool configuration"""
+    data: Dict[str, Any] = Field(..., description="Tool-specific data")
+
+
+# HTTP API Router using dynamic tools
+router = APIRouter()
+
+@router.get("/{project_id}/tool/{tool_name}", response_model=str)
+async def get_tool_content(
+    project_id: str,
+    tool_name: str,
+    api_key: str = Depends(verify_api_key)
+):
+    """Get tool content for any dynamically configured tool"""
+    tool_loader = get_tool_loader()
+    
+    # Find tool config by name
+    tool_key = None
+    for key, config in tool_loader.tools_config.items():
+        if config.name == tool_name:
+            tool_key = key
+            break
+    
+    if not tool_key:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
+    
+    content = storage.get_tool_content(tool_key, project_id)
+    
+    if not content:
+        # Generate default content
+        title = tool_key.replace('_', ' ').title()
+        content = f"""# {title} - {project_id}
+
+*No content available for this tool*
+
+*Note: Use the corresponding update endpoint to set this information*"""
+    
+    return content
+
+@router.post("/{project_id}/tool/{tool_name}", response_model=str)
+async def update_tool_content(
+    project_id: str,
+    tool_name: str,
+    request_data: ToolUpdateRequest,
+    api_key: str = Depends(verify_api_key)
+):
+    """Update tool content for any dynamically configured tool"""
+    tool_loader = get_tool_loader()
+    
+    # Find tool config by name
+    tool_key = None
+    for key, config in tool_loader.tools_config.items():
+        if config.name == tool_name:
+            tool_key = key
+            break
+    
+    if not tool_key:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
+    
+    # Generate content based on tool type and provided data
+    content = _generate_content_from_data(tool_key, project_id, request_data.data)
+    
+    # Save the content
+    success = storage.save_tool_content(tool_key, project_id, content)
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save content")
+    
+    return content
+
+# Convenience endpoints for default project
+@router.get("/default/tool/{tool_name}", response_model=str)
+async def get_default_tool_content(
+    tool_name: str,
+    api_key: str = Depends(verify_api_key)
+):
+    """Get tool content for default project"""
+    return await get_tool_content(settings.default_project_id, tool_name, api_key)
+
+@router.post("/default/tool/{tool_name}", response_model=str)
+async def update_default_tool_content(
+    tool_name: str,
+    request_data: ToolUpdateRequest,
+    api_key: str = Depends(verify_api_key)
+):
+    """Update tool content for default project"""
+    return await update_tool_content(settings.default_project_id, tool_name, request_data, api_key)
+
+def _generate_content_from_data(tool_key: str, project_id: str, data: dict) -> str:
+    """Generate markdown content from tool data"""
+    title = tool_key.replace('_', ' ').title()
+    content = f"# {title} - {project_id}\n\n"
+    
+    if tool_key == "project_overview":
+        content += f"""## Business Description
+{data.get('business_description', '')}
+
+## Target Users
+{data.get('target_users', '')}
+
+## Main Features
+{data.get('main_features', '')}"""
+    elif tool_key == "technology_stack":
+        content += f"""## Frontend
+{data.get('frontend', '')}
+
+## Backend
+{data.get('backend', '')}
+
+## Database
+{data.get('database', '')}
+
+## Infrastructure
+{data.get('infrastructure', '')}
+
+## Tools
+{data.get('tools', '')}"""
+    elif tool_key == "project_structure":
+        content += f"""## Folder Structure
+{data.get('folder_structure', '')}
+
+## Naming Conventions
+{data.get('naming_conventions', '')}
+
+## Architecture Approach
+{data.get('architecture_approach', '')}"""
+    else:
+        # Generic content handling
+        content += data.get('content', '*No content provided*')
+    
+    return content

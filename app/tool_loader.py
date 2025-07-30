@@ -133,19 +133,6 @@ class DynamicToolLoader:
             }
             tools.append(get_tool)
             
-            # Update tool schema - dynamically determine schema based on tool
-            update_tool_name = f"update_{tool_key}"
-            update_description = f"Update {tool_key.replace('_', ' ')} information"
-            
-            # Create update schema based on the file content structure
-            update_schema = self._generate_update_schema(tool_key)
-            
-            update_tool = {
-                "name": update_tool_name,
-                "description": update_description,
-                "inputSchema": update_schema
-            }
-            tools.append(update_tool)
         
         return tools
     
