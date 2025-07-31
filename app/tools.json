@@ -2,16 +2,85 @@
     "project_overview": {
         "name": "get_project_overview",
         "description": "Call this tool when you need to understand the business context, target audience, or core functionality of the project. Use this information to make decisions about feature implementation, user experience, and business logic alignment. Essential for ensuring your code serves the intended business purpose and user needs.",
-        "file": "PROJECT_OVERVIEW.md"
+        "file": "PROJECT_OVERVIEW.md",
+        "update_fields": {
+            "business_description": {
+                "type": "string",
+                "description": "Clear description of what the business/project does, its value proposition, and core objectives"
+            },
+            "target_users": {
+                "type": "string", 
+                "description": "Detailed description of the intended users, their needs, technical level, and use cases"
+            },
+            "main_features": {
+                "type": "string",
+                "description": "List of primary features and functionality that define the project's core capabilities"
+            }
+        },
+        "content_template": "# {title} - {project_id}\n\n## Business Description\n{business_description}\n\n## Target Users\n{target_users}\n\n## Main Features\n{main_features}",
+        "default_content": "# Project Overview - {project_id}\n\n## Business Description\n*No business description available*\n\n## Target Users\n*No target users defined*\n\n## Main Features\n*No main features listed*\n\n*Note: Use update_project_overview tool to set this information*"
     },
     "project_structure": {
         "name": "get_project_structure",
         "description": "Use this tool to retrieve the overall structure of the project, including key directories and files. This is crucial for understanding how the project is organized, which can inform your decisions on where to place new code, how to navigate the codebase, and how to maintain consistency across the project.",
-        "file": "PROJECT_STRUCTURE.md"
+        "file": "PROJECT_STRUCTURE.md",
+        "update_fields": {
+            "folder_structure": {
+                "type": "string",
+                "description": "Detailed folder organization with explanations"
+            },
+            "naming_conventions": {
+                "type": "string",
+                "description": "File naming patterns, variable naming styles, class naming conventions"
+            },
+            "architecture_approach": {
+                "type": "string",
+                "description": "Architectural patterns, design principles, code organization strategies"
+            }
+        },
+        "content_template": "# {title} - {project_id}\n\n## Folder Structure\n{folder_structure}\n\n## Naming Conventions\n{naming_conventions}\n\n## Architecture Approach\n{architecture_approach}",
+        "default_content": "# Project Structure - {project_id}\n\n## Folder Structure\n*No folder structure defined*\n\n## Naming Conventions\n*No naming conventions specified*\n\n## Architecture Approach\n*No architecture approach defined*\n\n*Note: Use update_project_structure tool to set this information*"
     },
     "technology_stack": {
         "name": "get_technology_stack",
         "description": "Call this tool to get an overview of the technologies used in the project. This includes programming languages, frameworks, libraries, and tools. Understanding the technology stack is essential for making informed decisions about code implementation, compatibility, and leveraging existing tools effectively.",
-        "file": "TECHNOLOGY_STACK.md"
+        "file": "TECHNOLOGY_STACK.md",
+        "update_fields": {
+            "frontend": {
+                "type": "string",
+                "description": "Frontend frameworks, libraries, and tools"
+            },
+            "backend": {
+                "type": "string",
+                "description": "Backend technologies, frameworks, and runtime environments"
+            },
+            "database": {
+                "type": "string",
+                "description": "Database systems, ORMs, migration tools"
+            },
+            "infrastructure": {
+                "type": "string",
+                "description": "Deployment, hosting, containers, cloud services"
+            },
+            "tools": {
+                "type": "string",
+                "description": "Development tools, testing frameworks, CI/CD, linting"
+            }
+        },
+        "content_template": "# {title} - {project_id}\n\n## Frontend\n{frontend}\n\n## Backend\n{backend}\n\n## Database\n{database}\n\n## Infrastructure\n{infrastructure}\n\n## Tools\n{tools}",
+        "default_content": "# Technology Stack - {project_id}\n\n## Frontend\n*No frontend technologies specified*\n\n## Backend\n*No backend technologies specified*\n\n## Database\n*No database technologies specified*\n\n## Infrastructure\n*No infrastructure technologies specified*\n\n## Tools\n*No tools specified*\n\n*Note: Use update_technology_stack tool to set this information*"
+    },
+    "considering": {
+        "name": "get_considering",
+        "description": "Call this tool to access important considerations, concerns, best practices, and anti-patterns that AI agents should be aware of when working on this project. This includes guidance on what to prioritize, what to avoid, and important contextual factors that should influence decision-making and code implementation.",
+        "file": "CONSIDERING.md",
+        "update_fields": {
+            "content": {
+                "type": "string",
+                "description": "Important considerations, best practices, and guidance for AI agents"
+            }
+        },
+        "content_template": "# {title} - {project_id}\n\n{content}",
+        "default_content": "# Considering - {project_id}\n\n*No considerations defined*\n\n*Note: Use update_considering tool to set this information*"
     }
 }

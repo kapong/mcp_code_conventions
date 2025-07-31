@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel, Field
 from mcp.server import Server
 from mcp.types import Tool, TextContent
-from app.storage import storage
+from app.storage import get_global_storage
 from app.config import settings
 from app.tool_loader import get_tool_loader
 from app.auth import verify_api_key
@@ -16,55 +16,23 @@ class MCPOverHTTPHandler:
         self.server = Server("mcp-code-conventions")
         self.tools = []
         self.tool_handler = None
+        self.tool_loader = get_tool_loader()
         self._setup_tools()
     
     def _setup_tools(self):
         @self.server.list_tools()
         async def list_tools() -> list[Tool]:
-            tools = [
-                Tool(
-                    name="get_project_overview",
-                    description="Call this tool when you need to understand the business context, target audience, or core functionality of the project. Use this information to make decisions about feature implementation, user experience, and business logic alignment. Essential for ensuring your code serves the intended business purpose and user needs.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "project_id": {
-                                "type": "string",
-                                "description": "Project identifier (defaults to 'default')",
-                                "default": "default"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="get_technology_stack",
-                    description="Call this tool before writing code to understand which frameworks, libraries, and technologies are already in use. Essential for maintaining consistency, avoiding conflicts, and ensuring compatibility. Use this information to choose appropriate dependencies, follow established patterns, and integrate properly with existing systems.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "project_id": {
-                                "type": "string",
-                                "description": "Project identifier (defaults to 'default')",
-                                "default": "default"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="get_project_structure",
-                    description="Call this tool whenever you are generating code and need to align with the project's file organization, naming conventions, or architecture guidelines. Ensures that generated code fits cleanly into the existing structure of the app and services. Essential for maintaining code organization, following team standards, and ensuring files are placed in the correct locations.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "project_id": {
-                                "type": "string",
-                                "description": "Project identifier (defaults to 'default')",
-                                "default": "default"
-                            }
-                        }
-                    }
-                )
-            ]
+            # Generate tools dynamically from tools.json configuration
+            tool_schemas = self.tool_loader.get_mcp_tools_schema()
+            tools = []
+            
+            for schema in tool_schemas:
+                tools.append(Tool(
+                    name=schema["name"],
+                    description=schema["description"],
+                    inputSchema=schema["inputSchema"]
+                ))
+            
             self.tools = tools
             return tools
 
@@ -72,111 +40,39 @@ class MCPOverHTTPHandler:
         async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             # Extract project_id from URL context or arguments
             project_id = arguments.get("project_id", settings.default_project_id)
-            if name == "get_project_overview":
-                overview_data = storage.get_project_overview(project_id)
-                
-                if not overview_data:
-                    content = f"""# Project Overview - {project_id}
-
-## Business Description
-*No business description available*
-
-## Target Users
-*No target users defined*
-
-## Main Features
-*No main features listed*
-
-*Note: Use update_project_overview tool to set this information*"""
-                else:
-                    content = f"""# Project Overview - {project_id}
-
-## Business Description
-{overview_data.get('business_description') or '*No business description available*'}
-
-## Target Users
-{overview_data.get('target_users') or '*No target users defined*'}
-
-## Main Features
-{overview_data.get('main_features') or '*No main features listed*'}"""
-                
-                return [TextContent(type="text", text=content)]
             
-            elif name == "get_technology_stack":
-                tech_stack_data = storage.get_technology_stack(project_id)
-                
-                if not tech_stack_data:
-                    content = f"""# Technology Stack - {project_id}
-
-## Frontend
-*No frontend technologies specified*
-
-## Backend
-*No backend technologies specified*
-
-## Database
-*No database technologies specified*
-
-## Infrastructure
-*No infrastructure technologies specified*
-
-## Tools
-*No tools specified*
-
-*Note: Use update_technology_stack tool to set this information*"""
-                else:
-                    content = f"""# Technology Stack - {project_id}
-
-## Frontend
-{tech_stack_data.get('frontend') or '*No frontend technologies specified*'}
-
-## Backend
-{tech_stack_data.get('backend') or '*No backend technologies specified*'}
-
-## Database
-{tech_stack_data.get('database') or '*No database technologies specified*'}
-
-## Infrastructure
-{tech_stack_data.get('infrastructure') or '*No infrastructure technologies specified*'}
-
-## Tools
-{tech_stack_data.get('tools') or '*No tools specified*'}"""
-                
-                return [TextContent(type="text", text=content)]
+            # Find tool configuration by name
+            tool_key = None
+            for key, config in self.tool_loader.tools_config.items():
+                if config.name == name:
+                    tool_key = key
+                    break
             
-            elif name == "get_project_structure":
-                structure_data = storage.get_project_structure(project_id)
-                
-                if not structure_data:
-                    content = f"""# Project Structure - {project_id}
-
-## Folder Structure
-*No folder structure defined*
-
-## Naming Conventions
-*No naming conventions specified*
-
-## Architecture Approach
-*No architecture approach defined*
-
-*Note: Use update_project_structure tool to set this information*"""
-                else:
-                    content = f"""# Project Structure - {project_id}
-
-## Folder Structure
-{structure_data.get('folder_structure') or '*No folder structure defined*'}
-
-## Naming Conventions
-{structure_data.get('naming_conventions') or '*No naming conventions specified*'}
-
-## Architecture Approach
-{structure_data.get('architecture_approach') or '*No architecture approach defined*'}"""
-                
-                return [TextContent(type="text", text=content)]
+            if not tool_key:
+                raise Exception(f"Tool '{name}' not found in configuration")
+            
+            # Get content using the tool loader with fallback
+            content = self.tool_loader.get_file_content(tool_key, project_id)
+            
+            if not content:
+                # Generate default content using tool loader
+                content = self.tool_loader.generate_default_content(tool_key, project_id)
+            
+            return [TextContent(type="text", text=content)]
         
         # Store handlers for direct access
         self.list_tools_handler = list_tools
         self.call_tool_handler = call_tool
+    
+    def _generate_default_content(self, tool_key: str, project_id: str) -> str:
+        """Generate default content when no file exists for a tool"""
+        title = tool_key.replace('_', ' ').title()
+        
+        return f"""# {title} - {project_id}
+
+*No content available for this tool*
+
+*Note: Configure this tool in tools.json and add corresponding markdown file*"""
 
     async def handle_mcp_request(self, request: Request, project_id: str = "default") -> Dict[str, Any]:
         """Handle MCP protocol requests over HTTP"""
@@ -299,7 +195,7 @@ async def get_tool_content(
     if not tool_key:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
     
-    content = storage.get_tool_content(tool_key, project_id)
+    content = get_global_storage().get_tool_content(tool_key, project_id)
     
     if not content:
         # Generate default content
@@ -332,11 +228,11 @@ async def update_tool_content(
     if not tool_key:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
     
-    # Generate content based on tool type and provided data
-    content = _generate_content_from_data(tool_key, project_id, request_data.data)
+    # Generate content using tool loader
+    content = tool_loader.generate_content_from_data(tool_key, project_id, request_data.data)
     
     # Save the content
-    success = storage.save_tool_content(tool_key, project_id, content)
+    success = get_global_storage().save_tool_content(tool_key, project_id, content)
     
     if not success:
         raise HTTPException(status_code=500, detail="Failed to save content")
@@ -361,46 +257,3 @@ async def update_default_tool_content(
     """Update tool content for default project"""
     return await update_tool_content(settings.default_project_id, tool_name, request_data, api_key)
 
-def _generate_content_from_data(tool_key: str, project_id: str, data: dict) -> str:
-    """Generate markdown content from tool data"""
-    title = tool_key.replace('_', ' ').title()
-    content = f"# {title} - {project_id}\n\n"
-    
-    if tool_key == "project_overview":
-        content += f"""## Business Description
-{data.get('business_description', '')}
-
-## Target Users
-{data.get('target_users', '')}
-
-## Main Features
-{data.get('main_features', '')}"""
-    elif tool_key == "technology_stack":
-        content += f"""## Frontend
-{data.get('frontend', '')}
-
-## Backend
-{data.get('backend', '')}
-
-## Database
-{data.get('database', '')}
-
-## Infrastructure
-{data.get('infrastructure', '')}
-
-## Tools
-{data.get('tools', '')}"""
-    elif tool_key == "project_structure":
-        content += f"""## Folder Structure
-{data.get('folder_structure', '')}
-
-## Naming Conventions
-{data.get('naming_conventions', '')}
-
-## Architecture Approach
-{data.get('architecture_approach', '')}"""
-    else:
-        # Generic content handling
-        content += data.get('content', '*No content provided*')
-    
-    return content

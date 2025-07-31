@@ -2,7 +2,7 @@ import asyncio
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
-from app.storage import storage
+from app.storage import get_global_storage
 from app.config import settings
 from app.tool_loader import get_tool_loader
 
@@ -23,7 +23,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     # Handle get tools
     for tool_key, tool_config in tool_loader.tools_config.items():
         if name == tool_config.name:
-            content = storage.get_tool_content(tool_key, project_id)
+            content = get_global_storage().get_tool_content(tool_key, project_id)
             
             if not content:
                 content = f"""# {tool_key.replace('_', ' ').title()} - {project_id}

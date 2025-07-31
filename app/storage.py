@@ -22,30 +22,6 @@ class MarkdownStorage:
         else:
             raise IOError(f"Failed to save content for tool '{tool_key}' in project '{project_id}'")
     
-    # Tool-specific convenience methods
-    def get_project_overview(self, project_id: str) -> Optional[str]:
-        """Get project overview markdown content"""
-        return self.get_tool_content("project_overview", project_id)
-    
-    def save_project_overview(self, project_id: str, content: str) -> str:
-        """Save project overview markdown content"""
-        return self.save_tool_content("project_overview", project_id, content)
-    
-    def get_technology_stack(self, project_id: str) -> Optional[str]:
-        """Get technology stack markdown content"""
-        return self.get_tool_content("technology_stack", project_id)
-    
-    def save_technology_stack(self, project_id: str, content: str) -> str:
-        """Save technology stack markdown content"""
-        return self.save_tool_content("technology_stack", project_id, content)
-    
-    def get_project_structure(self, project_id: str) -> Optional[str]:
-        """Get project structure markdown content"""
-        return self.get_tool_content("project_structure", project_id)
-    
-    def save_project_structure(self, project_id: str, content: str) -> str:
-        """Save project structure markdown content"""
-        return self.save_tool_content("project_structure", project_id, content)
 
 # Global storage instance with lazy initialization
 _storage_instance = None
@@ -58,5 +34,12 @@ def get_storage():
         _storage_instance = MarkdownStorage(settings.data_dir)
     return _storage_instance
 
-# Global storage instance
-storage = get_storage()
+# Global storage instance (lazy initialization)
+storage = None
+
+def get_global_storage():
+    """Get or create global storage instance"""
+    global storage
+    if storage is None:
+        storage = get_storage()
+    return storage

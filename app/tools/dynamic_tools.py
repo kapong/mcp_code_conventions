@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Dict, Any
-from app.storage import storage
+from app.storage import get_global_storage
 from app.config import settings
 from app.auth import verify_api_key
 from app.tool_loader import get_tool_loader
 
 router = APIRouter()
+
+# Initialize tool loader
+tool_loader = get_tool_loader()
 
 class GenericContentRequest(BaseModel):
     """Generic content request for any tool"""
@@ -119,108 +122,118 @@ def _generate_content_from_data(tool_key: str, project_id: str, data: Dict[str, 
     
     return content
 
-# Specific endpoints for configured tools
-@router.get("/{project_id}/project-overview", response_model=str)
-async def get_project_overview(
-    project_id: str,
-    api_key: str = Depends(verify_api_key)
-):
-    content = storage.get_tool_content("project_overview", project_id)
+# Dynamic endpoint creation functions
+def _create_get_endpoint(tool_key: str, url_path: str):
+    """Create a GET endpoint for a tool"""
+    async def get_tool_content(
+        project_id: str,
+        api_key: str = Depends(verify_api_key)
+    ):
+        content = get_global_storage().get_tool_content(tool_key, project_id)
+        
+        if not content:
+            content = _generate_default_content(tool_key, project_id)
+        
+        return content
     
-    if not content:
-        content = _generate_default_content("project_overview", project_id)
+    return get_tool_content
+
+def _create_post_endpoint(tool_key: str, url_path: str):
+    """Create a POST endpoint for a tool"""
+    # Determine if this tool uses structured data or generic content
+    structured_tools = ["project_overview", "technology_stack", "project_structure"]
     
-    return content
+    if tool_key in structured_tools:
+        async def update_structured_tool_content(
+            project_id: str,
+            request_data: ToolUpdateRequest,
+            api_key: str = Depends(verify_api_key)
+        ):
+            content = _generate_content_from_data(tool_key, project_id, request_data.data)
+            return get_global_storage().save_tool_content(tool_key, project_id, content)
+        
+        return update_structured_tool_content
+    else:
+        async def update_generic_tool_content(
+            project_id: str,
+            request_data: GenericContentRequest,
+            api_key: str = Depends(verify_api_key)
+        ):
+            return get_global_storage().save_tool_content(tool_key, project_id, request_data.content)
+        
+        return update_generic_tool_content
 
-@router.post("/{project_id}/project-overview", response_model=str)
-async def update_project_overview(
-    project_id: str,
-    request_data: ToolUpdateRequest,
-    api_key: str = Depends(verify_api_key)
-):
-    content = _generate_content_from_data("project_overview", project_id, request_data.data)
-    return storage.save_tool_content("project_overview", project_id, content)
-
-@router.get("/default/project-overview", response_model=str)
-async def get_default_project_overview(
-    api_key: str = Depends(verify_api_key)
-):
-    return await get_project_overview(settings.default_project_id, api_key)
-
-@router.post("/default/project-overview", response_model=str)
-async def update_default_project_overview(
-    request_data: ToolUpdateRequest,
-    api_key: str = Depends(verify_api_key)
-):
-    return await update_project_overview(settings.default_project_id, request_data, api_key)
-
-@router.get("/{project_id}/technology-stack", response_model=str)
-async def get_technology_stack(
-    project_id: str,
-    api_key: str = Depends(verify_api_key)
-):
-    content = storage.get_tool_content("technology_stack", project_id)
+def _create_default_get_endpoint(tool_key: str, url_path: str):
+    """Create a default GET endpoint for a tool"""
+    get_endpoint = _create_get_endpoint(tool_key, url_path)
     
-    if not content:
-        content = _generate_default_content("technology_stack", project_id)
+    async def get_default_tool_content(
+        api_key: str = Depends(verify_api_key)
+    ):
+        return await get_endpoint(settings.default_project_id, api_key)
     
-    return content
+    return get_default_tool_content
 
-@router.post("/{project_id}/technology-stack", response_model=str)
-async def update_technology_stack(
-    project_id: str,
-    request_data: ToolUpdateRequest,
-    api_key: str = Depends(verify_api_key)
-):
-    content = _generate_content_from_data("technology_stack", project_id, request_data.data)
-    return storage.save_tool_content("technology_stack", project_id, content)
-
-@router.get("/default/technology-stack", response_model=str)
-async def get_default_technology_stack(
-    api_key: str = Depends(verify_api_key)
-):
-    return await get_technology_stack(settings.default_project_id, api_key)
-
-@router.post("/default/technology-stack", response_model=str)
-async def update_default_technology_stack(
-    request_data: ToolUpdateRequest,
-    api_key: str = Depends(verify_api_key)
-):
-    return await update_technology_stack(settings.default_project_id, request_data, api_key)
-
-@router.get("/{project_id}/project-structure", response_model=str)
-async def get_project_structure(
-    project_id: str,
-    api_key: str = Depends(verify_api_key)
-):
-    content = storage.get_tool_content("project_structure", project_id)
+def _create_default_post_endpoint(tool_key: str, url_path: str):
+    """Create a default POST endpoint for a tool"""
+    post_endpoint = _create_post_endpoint(tool_key, url_path)
+    structured_tools = ["project_overview", "technology_stack", "project_structure"]
     
-    if not content:
-        content = _generate_default_content("project_structure", project_id)
+    if tool_key in structured_tools:
+        async def update_default_structured_tool_content(
+            request_data: ToolUpdateRequest,
+            api_key: str = Depends(verify_api_key)
+        ):
+            return await post_endpoint(settings.default_project_id, request_data, api_key)
+        
+        return update_default_structured_tool_content
+    else:
+        async def update_default_generic_tool_content(
+            request_data: GenericContentRequest,
+            api_key: str = Depends(verify_api_key)
+        ):
+            return await post_endpoint(settings.default_project_id, request_data, api_key)
+        
+        return update_default_generic_tool_content
+
+# Dynamically register endpoints for all tools from tools.json
+for tool_key, tool_config in tool_loader.tools_config.items():
+    # Convert tool_key to URL path (e.g., "project_overview" -> "project-overview")
+    url_path = tool_key.replace('_', '-')
     
-    return content
-
-@router.post("/{project_id}/project-structure", response_model=str)
-async def update_project_structure(
-    project_id: str,
-    request_data: ToolUpdateRequest,
-    api_key: str = Depends(verify_api_key)
-):
-    content = _generate_content_from_data("project_structure", project_id, request_data.data)
-    return storage.save_tool_content("project_structure", project_id, content)
-
-@router.get("/default/project-structure", response_model=str)
-async def get_default_project_structure(
-    api_key: str = Depends(verify_api_key)
-):
-    return await get_project_structure(settings.default_project_id, api_key)
-
-@router.post("/default/project-structure", response_model=str)
-async def update_default_project_structure(
-    request_data: ToolUpdateRequest,
-    api_key: str = Depends(verify_api_key)
-):
-    return await update_project_structure(settings.default_project_id, request_data, api_key)
+    # Register project-specific endpoints
+    router.add_api_route(
+        f"/{{project_id}}/{url_path}",
+        _create_get_endpoint(tool_key, url_path),
+        methods=["GET"],
+        response_model=str,
+        name=f"get_{tool_key}"
+    )
+    
+    router.add_api_route(
+        f"/{{project_id}}/{url_path}",
+        _create_post_endpoint(tool_key, url_path),
+        methods=["POST"],
+        response_model=str,
+        name=f"update_{tool_key}"
+    )
+    
+    # Register default project endpoints
+    router.add_api_route(
+        f"/default/{url_path}",
+        _create_default_get_endpoint(tool_key, url_path),
+        methods=["GET"],
+        response_model=str,
+        name=f"get_default_{tool_key}"
+    )
+    
+    router.add_api_route(
+        f"/default/{url_path}",
+        _create_default_post_endpoint(tool_key, url_path),
+        methods=["POST"],
+        response_model=str,
+        name=f"update_default_{tool_key}"
+    )
 
 # Generic endpoints for additional tools
 @router.get("/{project_id}/tool/{tool_name}", response_model=str)
@@ -231,7 +244,7 @@ async def get_generic_content(
 ):
     """Generic endpoint for tools not explicitly defined"""
     tool_key = tool_name.replace('-', '_')
-    content = storage.get_tool_content(tool_key, project_id)
+    content = get_global_storage().get_tool_content(tool_key, project_id)
     
     if not content:
         content = _generate_default_content(tool_key, project_id)
@@ -247,4 +260,4 @@ async def update_generic_content(
 ):
     """Generic endpoint for updating tools not explicitly defined"""
     tool_key = tool_name.replace('-', '_')
-    return storage.save_tool_content(tool_key, project_id, request_data.content)
+    return get_global_storage().save_tool_content(tool_key, project_id, request_data.content)

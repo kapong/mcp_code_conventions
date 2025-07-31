@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, Depends
 from app.mcp_http_handler import mcp_handler, router as dynamic_http_router
+from app.tools.dynamic_tools import router as tools_router
 from app.auth import verify_api_key
 
 app = FastAPI(
@@ -9,6 +10,7 @@ app = FastAPI(
 )
 
 app.include_router(dynamic_http_router, tags=["Dynamic HTTP Tools"])
+app.include_router(tools_router, tags=["Tool Endpoints"])
 
 @app.get("/")
 async def root():
