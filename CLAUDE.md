@@ -9,6 +9,24 @@ This is an MCP (Model Context Protocol) server that provides tools for AI code a
 - **Project Structure**: Folder organization, naming conventions, and architecture patterns
 - **Automatic Fallback**: If a project doesn't have specific files, it automatically falls back to the default project
 
+## Current Development Stage
+This project is in **active development** with the following completed features:
+- ✅ Core MCP server implementation with Python MCP SDK
+- ✅ FastAPI HTTP API server for testing and direct access
+- ✅ Dynamic tool configuration via `tools.json`
+- ✅ File-based markdown storage system
+- ✅ Multi-project support with automatic fallback
+- ✅ Docker containerization and Docker Compose setup
+- ✅ API key authentication
+- ✅ Basic test infrastructure setup
+
+**Next planned features:**
+- 🚧 Comprehensive test coverage (tests/ directory created)
+- 🚧 Enhanced error handling and validation
+- 🚧 Additional tool types (considering guidelines, best practices)
+- 🚧 Performance optimizations
+- 🚧 Production deployment guides
+
 ## Technology Stack
 - **Backend**: Python 3.12+, FastAPI
 - **Storage**: File-based markdown storage in `/app/data/`
@@ -291,3 +309,47 @@ When connected via MCP, these tools are automatically available with detailed us
 - `update_project_structure` - **When to use**: Update when file organization, naming conventions, or architectural patterns change.
 
 **Note**: Each MCP connection is automatically scoped to the specified project_id, so all tools operate within that project context. AI agents should proactively use these tools to maintain project consistency and follow established conventions.
+
+## Recommended: Use This MCP Server for Developing This Repository
+
+For developers working on this MCP Code Conventions Server project, it's highly recommended to configure this server to manage its own development conventions. This provides a practical example of "eating your own dog food" and ensures consistent development practices.
+
+### Setup for Self-Development
+
+1. **Start the server locally**:
+   ```bash
+   # Run the MCP server
+   python run_mcp_server.py
+   
+   # Or run the FastAPI server
+   uvicorn app.main:app --reload --port 8000
+   ```
+
+2. **Configure Claude Code CLI to use this server**:
+   ```bash
+   # Add this project as an MCP server for itself
+   claude mcp add --transport http mcp-code-conventions-dev \
+     http://localhost:8000/mcp-code-conventions \
+     --header "Authorization: Bearer your-secret-api-key"
+   ```
+
+3. **Benefits of using this setup**:
+   - **Consistent Development**: AI agents will understand this project's conventions, tech stack, and structure
+   - **Self-Documentation**: Forces keeping project documentation up-to-date in the MCP format
+   - **Testing in Practice**: Real-world usage while developing provides immediate feedback
+   - **Example for Users**: Demonstrates how to properly configure and use the server
+
+4. **Required project files** (create in `/app/data/mcp-code-conventions/`):
+   - `PROJECT_OVERVIEW.md` - Business context and goals for this MCP server
+   - `TECHNOLOGY_STACK.md` - Python, FastAPI, MCP SDK, Docker stack details
+   - `PROJECT_STRUCTURE.md` - File organization and naming conventions for this codebase
+   - `CONSIDERING.md` - Development guidelines, security considerations, testing approaches
+
+5. **Example configuration for this project**:
+   ```bash
+   # Test the setup
+   curl -H "Authorization: Bearer your-secret-api-key" \
+        http://localhost:8000/mcp-code-conventions/project-overview
+   ```
+
+This self-referential approach ensures the project conventions are always accessible to AI development assistants and provides a concrete example for users on how to structure their own project conventions.
